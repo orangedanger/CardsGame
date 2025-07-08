@@ -7,6 +7,7 @@
 #include "InputMappingContext.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "SAdvancedTransformInputBox.h"
 #include "Cards/Character/CharacterBase.h"
 #include "Cards/Pawn/CameraPawn.h"
 
@@ -58,8 +59,9 @@ void ACardsPlayerController::Move(const FInputActionValue& Input)
 
 	if(APawn* ControllerPawn = GetPawn())
 	{
-		ControllerPawn->AddMovementInput(ForwardDir,PlayerAxisVector.X);
-		ControllerPawn->AddMovementInput(RightDir,PlayerAxisVector.Y);
+		constexpr float SpeedBonus = 0.5f;
+		ControllerPawn->AddMovementInput(ForwardDir,SpeedBonus*PlayerAxisVector.X);
+		ControllerPawn->AddMovementInput(RightDir,SpeedBonus*PlayerAxisVector.Y);
 		ControllerPawn->AddMovementInput(FVector(0,0,1),PlayerAxisVector.Z);
 	}
 }
@@ -72,7 +74,7 @@ void ACardsPlayerController::Zoom(const FInputActionValue& Input)
 	const ACameraPawn* CameraPawn = CastChecked<ACameraPawn>(GetPawn());
 	if(CameraPawn)
 	{
-		constexpr float ZoomScale = 100.f;
+		constexpr float ZoomScale = 50.f;
 		CameraPawn->AddSpringArmLength(ZoomScale*ZoomDir);
 	}
 }
@@ -82,9 +84,5 @@ void ACardsPlayerController::Rotate(const FInputActionValue& Input)
 	//Q,E控制左右旋转
 	const float RotateDir = Input.Get<float>();
 
-	const ACameraPawn* CameraPawn = CastChecked<ACameraPawn>(GetPawn());
-	if(CameraPawn)
-	{
-		CameraPawn->AddSpringArmYawRotation(RotateDir);
-	}
+	SetControlRotation(GetControlRotation()+FRotator(0,RotateDir,0));
 }

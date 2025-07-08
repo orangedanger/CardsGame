@@ -27,13 +27,7 @@ private:
 
 	UPROPERTY(EditAnywhere,Category="Components")
 	USpringArmComponent* SpringArm;
-
-	UPROPERTY(EditAnywhere,Category="Components")
-	UStaticMeshComponent* Mesh;
-
 public:
 
 	void AddSpringArmLength(float Length) const;
-	void AddSpringArmYawRotation(float Yaw) const;
-
 };

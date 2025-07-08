@@ -14,14 +14,10 @@
 ACameraPawn::ACameraPawn()
 {
 	PrimaryActorTick.bCanEverTick = false;
-
-	Mesh = CreateDefaultSubobject<UStaticMeshComponent>("StaticMeshComponent");
-	SetRootComponent(Mesh);
 	
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>("SpringArmComponent");
 	SpringArm->TargetArmLength=400;
 	SpringArm->SetRelativeRotation(FRotator(-45.f, 0.f, 0.f));
-	SpringArm->SetupAttachment(Mesh);
 	
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>("CameraComponent");
 	CameraComponent->SetRelativeLocation(FVector(0, 0, 0));
@@ -36,13 +32,5 @@ void ACameraPawn::BeginPlay()
 
 void ACameraPawn::AddSpringArmLength(float Length) const
 {
-	SpringArm->TargetArmLength+=Length;
+	SpringArm->TargetArmLength = FMath::Clamp(SpringArm->TargetArmLength + Length, 100.f, 1200.f);
 }
-
-void ACameraPawn::AddSpringArmYawRotation(float Yaw) const
-{
-	const FRotator SpringArmRotation = SpringArm->GetRelativeRotation();
-	FRotator SetRotation = FRotator(SpringArmRotation.Pitch,SpringArmRotation.Yaw + Yaw,SpringArmRotation.Roll);
-	SpringArm->SetRelativeRotation(SetRotation);
-}
-
