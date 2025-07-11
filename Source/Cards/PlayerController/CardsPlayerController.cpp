@@ -42,9 +42,6 @@ void ACardsPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(MoveAction,ETriggerEvent::Triggered,this,&ACardsPlayerController::Move);
 	EnhancedInputComponent->BindAction(ZoomAction,ETriggerEvent::Triggered,this,&ACardsPlayerController::Zoom);
 	EnhancedInputComponent->BindAction(RotateAction,ETriggerEvent::Triggered,this,&ACardsPlayerController::Rotate);
-
-	
-	
 }
 
 void ACardsPlayerController::Move(const FInputActionValue& Input)

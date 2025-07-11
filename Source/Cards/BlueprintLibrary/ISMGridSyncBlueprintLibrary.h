@@ -16,5 +16,5 @@ class CARDS_API UISMGridSyncBlueprintLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, Category = "ISM Grid Sync Blueprints",meta = (DefaultToSelf = "WorldContext"))
-	static FVector SyncGridsVector(UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize);
+	static FVector SnapToGrid(UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize);
 };

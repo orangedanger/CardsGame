@@ -37,4 +37,7 @@ private:
 
 	UPROPERTY(EditAnywhere,Category="RegionalType")
 	ERegionalActor RegionalType = ERegionalActor::None;
+
+public:
+	FORCEINLINE ERegionalActor GetRegionalType() const { return RegionalType; }
 };

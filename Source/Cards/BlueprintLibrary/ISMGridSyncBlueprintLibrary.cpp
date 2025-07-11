@@ -5,7 +5,7 @@
 #include "Kismet/KismetMathLibrary.h"
 
 
-FVector UISMGridSyncBlueprintLibrary::SyncGridsVector(UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize)
+FVector UISMGridSyncBlueprintLibrary::SnapToGrid(UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize)
 {
 	const float X = UKismetMathLibrary::GridSnap_Float(StartCenter.X,GridSize.X);
 	const float Y = UKismetMathLibrary::GridSnap_Float(StartCenter.Y,GridSize.Y);
