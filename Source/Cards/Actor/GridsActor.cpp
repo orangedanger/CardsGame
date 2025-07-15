@@ -8,6 +8,7 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Math/Vector.h"
+#include "Cards/Cards.h"
 
 AGridsActor::AGridsActor()
 {
@@ -30,21 +31,21 @@ void AGridsActor::DrawGrid()
 	const int32 Width =FMath::RoundToInt32(CountSize.Y);
 	
 	//计算最左端点
-	LeftBottonLocation = ProcessLeftBottonLocation(Length ,Width);
+	LeftBottomLocation = ProcessLeftBottomLocation(Length ,Width);
 	
 	//设置每个的缩放和位置
 	FTransform Transform = FTransform();
 	FVector Scale = GridSize /Mesh->GetStaticMesh()->GetBoundingBox().GetSize();
 	Scale.Z =1;
 	Transform.SetScale3D(Scale);
-	FVector StartLocation = LeftBottonLocation;
+	FVector StartLocation = LeftBottomLocation;
 	//遍历生成每个网格
 	for (int i = 0; i < Length; i++)
 	{
 		for (int j = 0; j < Width; j++)
 		{
 			//Grids的位置偏移
-			StartLocation = FVector(LeftBottonLocation.X + i* GridSize.X, LeftBottonLocation.Y + j*GridSize.Y, LeftBottonLocation.Z);
+			StartLocation = FVector(LeftBottomLocation.X + i* GridSize.X, LeftBottomLocation.Y + j*GridSize.Y, LeftBottomLocation.Z);
 			
 			//对碰撞的变量进行初始化
 			TArray<FHitResult> Hits;
@@ -58,7 +59,7 @@ void AGridsActor::DrawGrid()
 				Start,
 				End,
 				Radius,
-				ETraceTypeQuery(ECC_GameTraceChannel1),
+				static_cast<ETraceTypeQuery>(TRACE_GROUND),
 				false,
 				TArray<AActor*>(),
 				EDrawDebugTrace::None,
@@ -71,7 +72,7 @@ void AGridsActor::DrawGrid()
 	}
 }
 
-FVector AGridsActor::ProcessLeftBottonLocation(const int32 Length ,const int32 Width) const
+FVector AGridsActor::ProcessLeftBottomLocation(const int32 Length ,const int32 Width) const
 {
 	//当长度或宽度为奇数时 长度或宽度需要减去半个Size大小
 	FVector Subtract = FVector(Length * GridSize.X/2,Width * GridSize.Y/2,0);
@@ -85,7 +86,6 @@ FVector AGridsActor::ProcessLeftBottonLocation(const int32 Length ,const int32 W
 	}
 	return CenterLocation - Subtract;
 }
-
 
 void AGridsActor::AddGridsToMesh(FTransform Transform, FVector& StartLocation, TArray<FHitResult> Hits, const float Radius) const
 {
@@ -117,7 +117,6 @@ bool AGridsActor::IsWalkable(TArray<FHitResult> Hits)
 	}
 	return bIsWalkable;
 }
-
 
 void AGridsActor::BeginPlay()
 {

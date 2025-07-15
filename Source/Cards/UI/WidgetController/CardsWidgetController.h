@@ -9,7 +9,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType)
 class CARDS_API UCardsWidgetController : public UObject
 {
 	GENERATED_BODY()

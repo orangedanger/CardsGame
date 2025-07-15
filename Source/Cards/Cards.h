@@ -4,3 +4,5 @@
 
 #include "CoreMinimal.h"
 
+#define TRACE_GROUND ECC_GameTraceChannel1
+#define TRACE_GRIDS ECC_GameTraceChannel2

@@ -18,7 +18,7 @@ public:
 	void SetWidgetController(UObject* Controller);
 
 protected:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(BlueprintReadOnly,Category="Widget Controller")
 	TObjectPtr<UObject> WidgetController;
 
 	UFUNCTION(BlueprintImplementableEvent)

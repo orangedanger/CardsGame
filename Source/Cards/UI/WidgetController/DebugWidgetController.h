@@ -10,7 +10,7 @@ class AGridsActor;
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType,Blueprintable)
 class CARDS_API UDebugWidgetController : public UCardsWidgetController
 {
 	GENERATED_BODY()
@@ -19,6 +19,6 @@ public:
 	virtual void BroadcastCallbackToDependences() override;
 
 private:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly,meta = (AllowPrivateAccess = true), Category = "DebugWidgetController")
-	TObjectPtr<AGridsActor> GridActor;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly,meta = (AllowPrivateAccess = true), Category = "DebugWidgetController")
+	TSubclassOf<AGridsActor> GridActorClass;
 };

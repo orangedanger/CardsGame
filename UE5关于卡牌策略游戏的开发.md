@@ -71,6 +71,8 @@ git push -u orgin main
 
 ## 1.设置摄像头和鼠标选定角色进行移动
 
+### 1.1.一些增强输入和输入模式的设置
+
 需要在 Cards.Build.cs中添加[EnhancedInput](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Plugins/EnhancedInput)Module才能进行添加 UInputMappingContext
 
 ```c++
@@ -97,7 +99,7 @@ void ACardsPlayerController::BeginPlay()
 }
 ```
 
-
+### 1.2.增强输入的绑定
 
 绑定对应功能函数
 
@@ -115,7 +117,7 @@ void ACardsPlayerController::SetupInputComponent()
 }
 ```
 
-
+### 1.3.摄像机功能实现
 
 摄像机的移动实现
 
@@ -449,16 +451,14 @@ Index就是在WidgetSwitcher子项的排序
 
 再通过HUD去CreateWidget -> AddViewport
 
-### 4.2.完善Debug的第一个按钮功能
+#### 4.1.2.完善Debug的第一个按钮功能
 
-#### 4.2.1.GridsMenu设置
+##### 4.1.2.1.GridsMenu设置
 
 需要完成对Grids的局内设置
 将Grids可修改量添加进Widget
 
-
-
-#### 4.1.1.完善Debug的第二个按钮功能
+#### 4.1.4.完善Debug的第二个按钮功能
 
 
 
