@@ -52,24 +52,36 @@ void AGridsActor::DrawGrid()
 			const float Radius = GridSize.X/3;
 			FVector Start(StartLocation.X, StartLocation.Y, StartLocation.Z + 500);
 			FVector End(StartLocation.X, StartLocation.Y, StartLocation.Z - 500);
-			
+
 			//进行碰撞检测
 			UKismetSystemLibrary::SphereTraceMulti(
 				this,
 				Start,
 				End,
 				Radius,
-				static_cast<ETraceTypeQuery>(TRACE_GROUND),
+				UEngineTypes::ConvertToTraceType(TRACE_GROUND),
 				false,
 				TArray<AActor*>(),
 				EDrawDebugTrace::None,
 				Hits,
 				true);
-
+			
+			FIntPoint intPoint = FIntPoint(i,j);
 			//检测是否碰撞来选择是否进行添加
-			AddGridsToMesh(Transform, StartLocation, Hits, Radius);
+			if (AddGridsToMesh(Transform, StartLocation, Hits, Radius))
+			{
+				//成功则添加Tiles
+				Transform.SetLocation(StartLocation - LeftBottomLocation);
+				Tiles.Add(FIntPoint(i,j),FTileInfo(ShapeType ,Transform));
+			}
 		}
 	}
+}
+
+void AGridsActor::ClearGrid()
+{
+	Mesh->ClearInstances();
+	Tiles.Empty();
 }
 
 FVector AGridsActor::ProcessLeftBottomLocation(const int32 Length ,const int32 Width) const
@@ -87,7 +99,7 @@ FVector AGridsActor::ProcessLeftBottomLocation(const int32 Length ,const int32 W
 	return CenterLocation - Subtract;
 }
 
-void AGridsActor::AddGridsToMesh(FTransform Transform, FVector& StartLocation, TArray<FHitResult> Hits, const float Radius) const
+bool AGridsActor::AddGridsToMesh(FTransform Transform, FVector& StartLocation, TArray<FHitResult> Hits, const float Radius) const
 {
 	//如果检测到碰撞且满足可以行走
 	if(Hits.Num()>0 && IsWalkable(Hits))
@@ -97,7 +109,10 @@ void AGridsActor::AddGridsToMesh(FTransform Transform, FVector& StartLocation, T
 		Transform.SetLocation(StartLocation);
 		//设置bWorldSpace
 		Mesh->AddInstance(Transform,true);
+		Transform.SetLocation(StartLocation - LeftBottomLocation);
+		return true;
 	}
+	return false;
 }
 
 bool AGridsActor::IsWalkable(TArray<FHitResult> Hits)

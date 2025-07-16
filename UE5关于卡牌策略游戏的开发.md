@@ -427,6 +427,32 @@ void AGridsActor::AddGridsToMesh(FTransform Transform, FVector& StartLocation, T
 
 
 
+鼠标位置通常由PlayerController来获取
+
+DeprojectMousePositionToWorld
+
+```c++
+if (const ACardsPlayerController* CardsPC = Cast<ACardsPlayerController>(UGameplayStatics::GetPlayerController(WorldContext,0)))
+		{
+			FVector StartLocation;
+			FVector WorldDirection;
+			//将2D的鼠标位置转换成3D的位置
+			CardsPC->DeprojectMousePositionToWorld(StartLocation,WorldDirection);
+			//设置一个远处的点
+			WorldDirection *= 99999999;
+			const FVector EndLocation = StartLocation + WorldDirection;
+
+			//计算与Grids平面的交点
+			HitLocation = FMath::LinePlaneIntersection(
+				StartLocation,
+				EndLocation,
+				GridsCenter,
+				FVector(0,0,1));
+		}
+```
+
+
+
 #### 3.2.棋盘瓦片
 
 #### 3.2.1.棋盘瓦片信息
@@ -466,5 +492,20 @@ Index就是在WidgetSwitcher子项的排序
 
 
 
+Today To DO：
+
+完善 Index 和 ShapeType 
+
+我需要在一个结构体中存储 Tile的信息
+
+
+
+由于自定义结构体没加BlueprintType
+
+导致参数 Tiles无法暴露给蓝图
+
+
+
+完成 鼠标移动到Tile上进行显示
 
 

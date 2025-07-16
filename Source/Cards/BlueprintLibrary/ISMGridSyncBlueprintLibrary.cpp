@@ -4,13 +4,14 @@
 #include "ISMGridSyncBlueprintLibrary.h"
 
 #include "Cards/Cards.h"
+#include "Cards/Actor/GridsActor.h"
 #include "Cards/PlayerController/CardsPlayerController.h"
 #include "Cards/UI/HUD/DebugHUD.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 
 
-FVector UISMGridSyncBlueprintLibrary::SnapToGrid(UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize)
+FVector UISMGridSyncBlueprintLibrary::SnapToGrid(const UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize)
 {
 	const float X = UKismetMathLibrary::GridSnap_Float(StartCenter.X,GridSize.X);
 	const float Y = UKismetMathLibrary::GridSnap_Float(StartCenter.Y,GridSize.Y);
@@ -42,7 +43,7 @@ FHitResult UISMGridSyncBlueprintLibrary::GetCursorHitTile(const UObject* WorldCo
 	{
 		FHitResult Hit;
 		CardsPC->GetHitResultUnderCursorByChannel(
-		static_cast<ETraceTypeQuery>(TRACE_GRIDS),
+		UEngineTypes::ConvertToTraceType(TRACE_GRIDS),
 		false,
 		Hit
 		);
@@ -71,7 +72,7 @@ FVector UISMGridSyncBlueprintLibrary::GetCursorHitTileLocation(const UObject* Wo
 			//设置一个远处的点
 			WorldDirection *= 99999999;
 			const FVector EndLocation = StartLocation + WorldDirection;
-
+			
 			//计算与Grids平面的交点
 			HitLocation = FMath::LinePlaneIntersection(
 				StartLocation,
@@ -81,5 +82,19 @@ FVector UISMGridSyncBlueprintLibrary::GetCursorHitTileLocation(const UObject* Wo
 		}
 	}
 	return HitLocation;
+}
+
+FIntPoint UISMGridSyncBlueprintLibrary::GetIndexFromWorldLocation(const UObject* WorldContext, const FVector& WorldLocation,
+	const AGridsActor* Grids)
+{
+	const FVector GridSize = Grids->GetGridSize();
+	const FVector SnapLocation = SnapToGrid(WorldContext,WorldLocation - Grids->GetLeftBottomLocation(),GridSize);
+	
+	const FVector2D SnapVector2D = FVector2D(SnapLocation.X,SnapLocation.Y);
+	const FVector2D SizeVector2D = FVector2D(GridSize.X,GridSize.Y);
+	const FVector2D Result = SnapVector2D / SizeVector2D;
+	
+	const FIntPoint Index =Result.IntPoint();
+	return Index;
 }
 
