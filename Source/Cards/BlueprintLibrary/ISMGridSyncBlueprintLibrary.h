@@ -6,6 +6,8 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "ISMGridSyncBlueprintLibrary.generated.h"
 
+class AGridsActor;
+class UTileDataAsset;
 class UDebugWidgetController;
 /**
  * 
@@ -17,7 +19,7 @@ class CARDS_API UISMGridSyncBlueprintLibrary : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, Category = "ISM Grid Sync Blueprints",meta = (DefaultToSelf = "WorldContext"))
-	static FVector SnapToGrid(UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize);
+	static FVector SnapToGrid(const UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize);
 	
 	UFUNCTION(BlueprintPure, Category = "ISM Grid Sync Blueprints",meta = (DefaultToSelf = "WorldContext"))
 	static UDebugWidgetController* GetDebugWidgetController(const UObject* WorldContext);
@@ -27,4 +29,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ISM Grid Sync Blueprints",meta = (DefaultToSelf = "WorldContext"))
 	static FVector GetCursorHitTileLocation(const UObject* WorldContext,const FVector& GridsCenter);
+
+	UFUNCTION(BlueprintPure, Category = "ISM Grid Sync Blueprints",meta = (DefaultToSelf = "WorldContext"))
+	static FIntPoint GetIndexFromWorldLocation(const UObject* WorldContext,const FVector& WorldLocation,const AGridsActor* Grids);
+
+	UFUNCTION(BlueprintPure, Category = "ISM Grid Sync Blueprints",meta = (DefaultToSelf = "WorldContext"))
+	static UTileDataAsset* GetTileDataAsset(const UObject* WorldContext);
 };
