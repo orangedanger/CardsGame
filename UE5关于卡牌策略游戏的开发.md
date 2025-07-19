@@ -506,6 +506,21 @@ Index就是在WidgetSwitcher子项的排序
 
 
 
+Today To DO：
+
+完善 Index 和 ShapeType 
+
+我需要在一个结构体中存储 Tile的信息
+
+
+
+由于自定义结构体没加BlueprintType
+
+导致参数 Tiles无法暴露给蓝图
+
+
+
+完成 鼠标移动到Tile上进行显示
 
 
 
