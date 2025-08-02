@@ -8,6 +8,15 @@
 
 #include "GridsActor.generated.h"
 
+UENUM(BlueprintType)
+enum class ETileState : uint8
+{
+	Normal,
+	Hovered,
+	Pressed,
+	Disabled,
+	None	
+};
 
 USTRUCT(BlueprintType,Blueprintable)
 struct FTileInfo
@@ -16,8 +25,15 @@ struct FTileInfo
 	public:
 	UPROPERTY(BlueprintReadOnly)
 	ETileShape TileShape = ETileShape::None ;	//形状
+	
 	UPROPERTY(BlueprintReadOnly)
 	FTransform Transform = FTransform();	//位置旋转缩放信息
+	
+	UPROPERTY(BlueprintReadOnly)
+	TArray<ETileState>TileStates = TArray<ETileState>(); //Tiles的状态信息
+
+	UPROPERTY(BlueprintReadOnly)
+	FIntPoint Index = FIntPoint();			//Tile的Index信息
 };
 
 class UStaticMeshComponent;
@@ -37,14 +53,35 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ClearGrid();
 
+	//当需要更改全部Tile时调用此函数
+	UFUNCTION(BlueprintCallable)
+	void UpdateGrid();
+	
 	UFUNCTION(BlueprintCallable)
 	void SetTileShape(ETileShape shapeType);
+	
+	UFUNCTION(BlueprintCallable)
+	void AddTileState(ETileState TileState);
+	
+	UFUNCTION(BlueprintCallable)
+	void RemoveTileState(ETileState TileState);
+
+	UFUNCTION(BlueprintCallable)
+	void AddInstance(FIntPoint Index,FTransform Transform);
+	
+	UFUNCTION(BlueprintCallable)
+	void RemoveInstance(FIntPoint Index) const;
+
+	//当需要更改单个或个别少量Tile时调用此函数
+	UFUNCTION(BlueprintCallable,BlueprintNativeEvent)
+	void UpdateInstance(const FTileInfo& Info);
 protected:
 	virtual void BeginPlay() override;
 	
 private:
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(AllowPrivateAccess=true))
 	UInstancedStaticMeshComponent* Mesh;
+
 	
 	FVector LeftBottomLocation;
 	TMap<FIntPoint,FTileInfo> Tiles;
@@ -61,10 +98,18 @@ private:
 	ETileShape ShapeType;
 	
 private:
-	bool AddGridsToMesh(FTransform Transform, FVector& StartLocation, TArray<FHitResult> Hits, const float Radius) const;
+	// 初始化网格
+	void InitializeGrid();
+	
+	void HexagonCountSet(int32& Length, int32& Width);
 	static bool IsWalkable(TArray<FHitResult> Hits);
 	FVector ProcessLeftBottomLocation(const int32 Length ,const int32 Width) const;
-
+	void CalculateGridPositionAndRotation(
+		FTransform &OutTransform,
+		const bool IsLengthEven,
+		const bool IsWidthEven,
+		const double LengthOffSet,
+		const double WidthOffset) const;
 
 public:
 	UFUNCTION(BlueprintCallable)

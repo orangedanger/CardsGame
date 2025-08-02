@@ -262,6 +262,12 @@ AddInstance需要的是WorldSpace
 只有当Instance的位置为世界位置时对齐才有作用
 不然CenterLocation一直是相对位置(0,0,0)没效果
 
+对齐公式
+
+```c++
+(Floor((Location + (Grid/(T)2)) / Grid) * Grid)
+```
+
 ```c++
 FVector UISMGridSyncBlueprintLibrary::SnapToGrid(UObject* WorldContext,const FVector& StartCenter, const FVector& GridSize)
 {
@@ -453,30 +459,240 @@ if (const ACardsPlayerController* CardsPC = Cast<ACardsPlayerController>(UGamepl
 
 
 
-#### 3.2.棋盘瓦片
+### 3.2.棋盘瓦片
 
 #### 3.2.1.棋盘瓦片信息
 
-需要给瓦片增加一些信息
-如：Index,Shape,Transform
+
+
+```c++
+USTRUCT(BlueprintType,Blueprintable)
+struct FTileInfo
+{
+ GENERATED_BODY()
+    public:
+    UPROPERTY(BlueprintReadOnly)
+    ETileShape TileShape = ETileShape::None ;  //形状
+    UPROPERTY(BlueprintReadOnly)
+    FTransform Transform = FTransform();   //位置旋转缩放信息
+};
+```
+
+这是棋盘信息的结构体
+
+主要存储形状和Tile的Shape
+
+```c++
+Tiles.Add(intPoint,FTileInfo(ShapeType ,Transform));
+```
+
+这样每次读取每个Tiles时都能获取相应的Transform和ShapeType
+
+关于Index
+
+对于三角形和正方形返回 x y即可
+
+```c++
+FIntPoint intPoint = FIntPoint(i,j);
+```
+
+对于六边形，我暂时采用双坐标
+
+```c++
+	//由于我们使用的是双坐标 宽度
+	//TODO:后期需要进行修改
+	if (ShapeType == ETileShape::Hexagon)
+	{
+		Length /=2;
+		Width*=2;
+	}
+```
+
+
+
+```c++
+//六边形为双坐标宽度的
+if (ShapeType == ETileShape::Hexagon)
+{
+	const int32 OffSetX = j%2==0?1:0; 
+	intPoint.X *= 2;
+	intPoint.X +=OffSetX;
+}
+```
+
+
 
 #### 3.2.2.瓦片的形状
 
+[对于六边形网格的研究资料][https://www.redblobgames.com/grids/hexagons/]
+
 添加ShapeType
 
+对于六边形网格，我们采用了双倍宽度坐标系
+即计算距离时 abs(高度差) + max(0,abs(宽度差)/2)
 
-#### 3.2.3.瓦片的类型
+即可求出距离
 
-添加 Index
+瓦片添加形状导致生成瓦片时不同
 
-我需要在一个结构体中存储 Tile的信息
+```c++
+void AGridsActor::CalculateGridPositionAndRotation(FTransform &OutTransform,const bool IsLengthEven,const bool IsWidthEven,const double LengthOffSet,const double WidthOffset) const
+{
+	//不同形状的绘制不同
+	FRotator OffsetRotation = FRotator::ZeroRotator;
+	FVector OffsetLocation = FVector::ZeroVector;
+	switch (ShapeType)
+	{
+	case ETileShape::None:
+		break;
+	case ETileShape::Square:
+		//Grids的位置偏移
+		OffsetLocation = FVector(LeftBottomLocation.X + LengthOffSet, LeftBottomLocation.Y + WidthOffset, LeftBottomLocation.Z);
+		break;
+	case ETileShape::Triangle:
+		//Grids的位置偏移
+		OffsetLocation = FVector(LeftBottomLocation.X + LengthOffSet, LeftBottomLocation.Y + WidthOffset/2, LeftBottomLocation.Z);
+		//是偶数时翻转
+		if (IsWidthEven)
+		{
+			OffsetRotation +=FRotator(0,180,0);
+		}
+		if (IsLengthEven)
+		{
+			OffsetRotation +=FRotator(0,180,0);
+		}
+		break;
+	case ETileShape::Hexagon:
+		//Grids的位置偏移
+		OffsetLocation = FVector(LeftBottomLocation.X + LengthOffSet *1.5 , LeftBottomLocation.Y + WidthOffset/2, LeftBottomLocation.Z);
+		if (IsWidthEven)
+		{
+			OffsetLocation += FVector(GridSize.X * 0.75, 0 ,0);
+		}
+		break;
+	}
+	OutTransform.SetRotation(OffsetRotation.Quaternion());
+	OutTransform.SetLocation(OffsetLocation);
+}
 
-由于自定义结构体没加BlueprintType
 
-导致参数 Tiles无法暴露给蓝图
+```
 
-完成 鼠标移动到Tile上进行显示
-Shape的实现
+对于不同形状的Index获取
+
+```c++
+FIntPoint UISMGridSyncBlueprintLibrary::GetIndexFromWorldLocation(const UObject* WorldContext, const FVector& WorldLocation,
+    const AGridsActor* Grids)
+{
+
+    //定义一些需要使用的数据
+    FIntPoint Index =FIntPoint::ZeroValue;
+    FVector SnapLocation = FVector::ZeroVector;
+    FVector2D SizeVector2D = FVector2D::ZeroVector;
+    FVector2D SnapVector2D = FVector2D::ZeroVector;
+    FVector2D Result = FVector2D::ZeroVector;
+
+    //转化一下数据到2D格式
+    const FVector GridSize = Grids->GetGridSize();
+    //本地坐标:相对网格左下角的坐标
+    const FVector LocalLocation = WorldLocation - Grids->GetLeftBottomLocation();
+
+    //需要根据Shape的不同采取不同的方法
+    switch (Grids->GetShapeType())
+    {
+    case ETileShape::None:
+       break;
+    case ETileShape::Square:
+       //对于正方形之间获取相对坐标然后除以GridSize即可
+       SnapLocation= SnapToGrid(WorldContext,LocalLocation,GridSize);
+       
+       SizeVector2D = FVector2D(GridSize.X,GridSize.Y);
+       SnapVector2D = FVector2D(SnapLocation.X,SnapLocation.Y);
+       
+       Result = SnapVector2D / SizeVector2D;
+       Index =Result.IntPoint();
+       break;
+    case ETileShape::Triangle:
+       
+       //三角形处理
+       //这里把三角形当中一半的正方形处理以快速运算
+       SnapLocation = SnapToGrid(
+          WorldContext,
+          LocalLocation,
+          GridSize*FVector(1,0.5,1)
+          );
+       
+       SizeVector2D = FVector2D(GridSize.X,GridSize.Y / 2);
+       
+       SnapVector2D = FVector2D(SnapLocation.X,SnapLocation.Y);
+       
+       Result = SnapVector2D / SizeVector2D;
+    
+       Index =Result.IntPoint();
+       break;
+    case ETileShape::Hexagon:
+
+       //六边形经过处理
+       //GridSize.X表示的是六边形的垂直长度
+       //GridSize.Y表示的是六边形的水平长度
+       
+       //LocalLocation对于Y上的乘2是因为我们采用的是 宽度的双坐标 需要对宽度乘以二做处理
+       //GridSize。Y*0.25原因是由于
+       
+       //0.75 * GridSize.X 上下两个六边形中心的垂直长度
+       //+FVector(25.f,0,0)的原因是由于Snap只会Snap到 -50 0 50，50倍数的点位
+       //实际上X坐标需要的点位是-25 25 75 等点位
+
+       //TODO: 我希望 0 ~ 50 Snap到 25   50 ~ 100 Snap 到 75
+       //然而现在是 -25 ~ 25 Snap 0     25 ~ 75 Snap 50
+       //Snap公式 (Floor((Location + (Grid/(T)2)) / Grid) * Grid)
+       //关键点 Floor((Location + (Grid/(T)2)) 需要让它 原本是 (1<=X<2 ) == 1 ->    (0.5 <=X<1.5） ==   0.5
+       
+       
+       SnapLocation = SnapToGrid(
+          WorldContext,
+          LocalLocation*FVector(1,2,1),
+          GridSize* FVector(0.75,0.5,1)
+          );
+       
+       SnapLocation.Y = FMath::CeilToInt(LocalLocation.Y / (GridSize.Y/2) )*GridSize.Y/2 - GridSize.Y/4;
+          
+       
+       SizeVector2D = FVector2D(GridSize.X * 0.75 ,GridSize.Y*0.25);
+       
+       SnapVector2D = FVector2D(SnapLocation.X,SnapLocation.Y);
+
+       Result = SnapVector2D / SizeVector2D;
+
+       Index =Result.IntPoint();
+       
+       
+       if (Index.X % 2 ==0)
+       {
+          const int Base = (Index.Y - 1) / 4;
+          // 奇数参考值映射：1,3→1; 5,7→3; 9,11→5
+          Index.Y =2 * Base + 1;
+       }
+       else
+       {
+          const int Base = (Index.Y - 3) / 4;
+          // 偶数参考值映射：3,5→2; 7,9→4; 11,13→6
+          Index.Y =2 * (Base + 1);
+       }
+       
+       break;
+    }
+
+    
+    return Index;
+}
+```
+
+
+
+#### 3.2.3.瓦片的点击
+
+当我鼠标触碰到这个Tile时去更换Material
 
 ## 4.UI界面
 
@@ -499,12 +715,6 @@ Index就是在WidgetSwitcher子项的排序
 将Grids可修改量添加进Widget
 
 #### 4.1.4.完善Debug的第二个按钮功能
-
-
-
-
-
-
 
 Today To DO：
 

@@ -27,6 +27,12 @@ public:
 	UMaterialInterface* TileMaterial = nullptr;
 	UPROPERTY(EditAnywhere)
 	UStaticMesh* TileStaticMesh = nullptr;
+	UPROPERTY(EditAnywhere)
+	UMaterialInterface* HoveredMaterial = nullptr;
+	UPROPERTY(EditAnywhere)
+	UMaterialInterface* PressedMaterial = nullptr;
+	UPROPERTY(EditAnywhere)
+	UMaterialInterface* DisabledMaterial = nullptr;
 };
 
 

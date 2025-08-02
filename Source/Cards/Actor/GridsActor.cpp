@@ -9,6 +9,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Math/Vector.h"
 #include "Cards/Cards.h"
+#include "EntitySystem/MovieSceneEntitySystemRunner.h"
 
 AGridsActor::AGridsActor()
 {
@@ -19,75 +20,65 @@ AGridsActor::AGridsActor()
 	
 }
 
+void AGridsActor::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	InitializeGrid();
+}
+
+void AGridsActor::InitializeGrid()
+{
+	SetTileShape(ShapeType);
+	UpdateGrid();
+
+	//根据需求设置数量（如4可存储RGB颜色和是否显示中间）
+	Mesh->SetNumCustomDataFloats(4);
+}
+
 void AGridsActor::DrawGrid()
 {
 	//更新CenterLocation
 	CenterLocation= GetActorLocation();
+	
 	//同步到网格上
-	CenterLocation = UISMGridSyncBlueprintLibrary::SnapToGrid(this,CenterLocation ,GridSize);
+	CenterLocation = UISMGridSyncBlueprintLibrary::SnapToGrid(CenterLocation ,GridSize);
 
 	//四舍五入长和宽
-	const int32 Length =FMath::RoundToInt32(CountSize.X);
-	const int32 Width =FMath::RoundToInt32(CountSize.Y);
+	int32 Length =FMath::RoundToInt32(CountSize.X);
+	int32 Width =FMath::RoundToInt32(CountSize.Y);
 	
 	//计算最左端点
 	LeftBottomLocation = ProcessLeftBottomLocation(Length ,Width);
-	
-	//设置每个的缩放和位置
+
+	//设置Tiles的缩放
 	FTransform Transform = FTransform();
 	FVector Scale = GridSize /Mesh->GetStaticMesh()->GetBoundingBox().GetSize();
 	Scale.Z =1;
 	Transform.SetScale3D(Scale);
-	FVector StartLocation = LeftBottomLocation;
+	
+	//由于我们使用的是双坐标 宽度
+	//TODO:后期需要进行修改
+	if (ShapeType == ETileShape::Hexagon)
+	{
+		HexagonCountSet(Length, Width);
+	}
+	
 	//遍历生成每个网格
 	for (int i = 0; i < Length; i++)
 	{
+		//判断长度是否为偶数
 		for (int j = 0; j < Width; j++)
 		{
-
-			//不同形状的绘制不同
-			FRotator OffsetRotation = FRotator::ZeroRotator;
-			switch (ShapeType)
-			{
-			case ETileShape::None:
-				break;
-			case ETileShape::Square:
-				//Grids的位置偏移
-				StartLocation = FVector(LeftBottomLocation.X + i* GridSize.X, LeftBottomLocation.Y + j*GridSize.Y, LeftBottomLocation.Z);
-				break;
-			case ETileShape::Triangle:
-				//Grids的位置偏移
-				StartLocation = FVector(LeftBottomLocation.X + i* GridSize.X, LeftBottomLocation.Y + j*GridSize.Y/2, LeftBottomLocation.Z);
-				//是偶数时翻转
-				if (j % 2 == 0)
-				{
-					OffsetRotation +=FRotator(0,180,0);
-				}
-				if (i %2 == 0)
-				{
-					OffsetRotation +=FRotator(0,180,0);
-				}
-				Transform.SetRotation(OffsetRotation.Quaternion());
-				
-				
-				break;
-			case ETileShape::Hexagon:
-				//Grids的位置偏移
-				StartLocation = FVector(LeftBottomLocation.X + i* GridSize.X *1.5 , LeftBottomLocation.Y + j*GridSize.Y/2, LeftBottomLocation.Z);
-				if (j % 2 == 0)
-				{
-					StartLocation += FVector(GridSize.X * 0.75, 0 ,0);
-				}
-
-				break;
-			}
-
+			//声明当前位置避免重复调用get函数
+			FVector CurrentPosition = Transform.GetLocation();
+			
 			//对碰撞的变量进行初始化
 			TArray<FHitResult> Hits;
 			const float Radius = GridSize.X/3;
-			FVector Start(StartLocation.X, StartLocation.Y, StartLocation.Z + 500);
-			FVector End(StartLocation.X, StartLocation.Y, StartLocation.Z - 500);
-
+			FVector Start(CurrentPosition.X, CurrentPosition.Y, CurrentPosition.Z + 500);
+			FVector End(CurrentPosition.X, CurrentPosition.Y, CurrentPosition.Z - 500);
+			
 			//进行碰撞检测
 			UKismetSystemLibrary::SphereTraceMulti(
 				this,
@@ -101,22 +92,73 @@ void AGridsActor::DrawGrid()
 				Hits,
 				true);
 			
-			FIntPoint intPoint = FIntPoint(i,j);
-			//检测是否碰撞来选择是否进行添加
-			if (AddGridsToMesh(Transform, StartLocation, Hits, Radius))
+			if (Hits.Num()>0 && IsWalkable(Hits))
 			{
+				FIntPoint intPoint = FIntPoint(i,j);
+				
+				AddInstance(intPoint,Transform);
+				
+				//设置Tile的信息
+				FTileInfo TileInfo;
+				TileInfo.TileShape = ShapeType;
+				TileInfo.Transform = Transform;
+				TileInfo.TileStates.AddUnique(ETileState::Normal);
+				//这里是将数据转化为Index 和 相对Location
 				//成功则添加Tiles
-				Transform.SetLocation(StartLocation - LeftBottomLocation);
-				Tiles.Add(FIntPoint(i,j),FTileInfo(ShapeType ,Transform));
+				Transform.SetLocation(CurrentPosition - LeftBottomLocation);
+				//六边形为双坐标宽度的
+				if (ShapeType == ETileShape::Hexagon)
+				{
+					const int32 OffSetX = j%2==0?1:0; 
+					intPoint.X *= 2;
+					intPoint.X +=OffSetX;
+				}
+				//添加Tile到数组
+				Tiles.Add(intPoint,TileInfo);
 			}
 		}
 	}
+}
+
+void AGridsActor::AddInstance(FIntPoint Index,FTransform Transform)
+{
+	//判断在Index位置的 XY 奇偶 来决定 三角形和六边形偏移
+	bool IsLengthEven = Index.X % 2 == 0;
+	bool IsWidthEven  =	Index.Y % 2 == 0;
+	double LengthOffSet = Index.X * GridSize.X;;
+	double WidthOffset = Index.Y * GridSize.Y;
+	
+	//计算不同形状的Tile的偏移,得到Transform
+	CalculateGridPositionAndRotation(Transform,IsLengthEven, IsWidthEven, LengthOffSet, WidthOffset);
+	
+	//设置bWorldSpace,Mesh中的坐标是世界坐标
+	Mesh->AddInstance(Transform,true);
+}
+
+void AGridsActor::RemoveInstance(FIntPoint Index) const
+{
+	Mesh->RemoveInstance(Index.X * CountSize.X + Index.Y);
+}
+
+void AGridsActor::UpdateInstance_Implementation(const FTileInfo& Info)
+{
+	RemoveInstance(Info.Index);
+	AddInstance(Info.Index,Info.Transform);
+
+	//获取颜色信息
+	//在蓝图中实现
 }
 
 void AGridsActor::ClearGrid()
 {
 	Mesh->ClearInstances();
 	Tiles.Empty();
+}
+
+void AGridsActor::UpdateGrid()
+{
+	ClearGrid();
+	DrawGrid();
 }
 
 void AGridsActor::SetTileShape(ETileShape shapeType)
@@ -137,6 +179,40 @@ void AGridsActor::SetTileShape(ETileShape shapeType)
 	}
 }
 
+void AGridsActor::AddTileState(ETileState TileState)
+{
+	const FVector HitTileLocation = UISMGridSyncBlueprintLibrary::GetCursorHitTileLocation(this,CenterLocation);
+	const FIntPoint Index = UISMGridSyncBlueprintLibrary::GetIndexFromWorldLocation(HitTileLocation,this);
+
+	if (FTileInfo* TileInfo =Tiles.Find(Index))
+	{
+		//检测TileStates有没有数据
+		if (TileInfo->TileStates.AddUnique(TileState) >= 0)
+		{
+			//有数据就更新
+			Tiles.Add(Index,*TileInfo);
+			//更新单个Instance
+			UpdateInstance(*TileInfo);
+		}
+	}
+	
+}
+
+void AGridsActor::RemoveTileState(const ETileState TileState)
+{
+	const FVector HitTileLocation = UISMGridSyncBlueprintLibrary::GetCursorHitTileLocation(this,CenterLocation);
+	const FIntPoint Index = UISMGridSyncBlueprintLibrary::GetIndexFromWorldLocation(HitTileLocation,this);
+
+	if (FTileInfo* TileInfo =Tiles.Find(Index))
+	{
+		TileInfo->TileStates.Remove(TileState);
+		Tiles.Add(Index,*TileInfo);
+		
+		//更新单个Instance
+		UpdateInstance(*TileInfo);
+	}
+}
+
 FVector AGridsActor::ProcessLeftBottomLocation(const int32 Length ,const int32 Width) const
 {
 	//当长度或宽度为奇数时 长度或宽度需要减去半个Size大小
@@ -150,22 +226,6 @@ FVector AGridsActor::ProcessLeftBottomLocation(const int32 Length ,const int32 W
 		Subtract.Y -=GridSize.Y/2;
 	}
 	return CenterLocation - Subtract;
-}
-
-bool AGridsActor::AddGridsToMesh(FTransform Transform, FVector& StartLocation, TArray<FHitResult> Hits, const float Radius) const
-{
-	//如果检测到碰撞且满足可以行走
-	if(Hits.Num()>0 && IsWalkable(Hits))
-	{
-		constexpr float OffsetGroundValue = 1.f;
-		StartLocation.Z = Hits[0].Location.Z  - Radius + OffsetGroundValue;
-		Transform.SetLocation(StartLocation);
-		//设置bWorldSpace
-		Mesh->AddInstance(Transform,true);
-		Transform.SetLocation(StartLocation - LeftBottomLocation);
-		return true;
-	}
-	return false;
 }
 
 bool AGridsActor::IsWalkable(TArray<FHitResult> Hits)
@@ -186,10 +246,49 @@ bool AGridsActor::IsWalkable(TArray<FHitResult> Hits)
 	return bIsWalkable;
 }
 
-void AGridsActor::BeginPlay()
+void AGridsActor::CalculateGridPositionAndRotation(FTransform &OutTransform,const bool IsLengthEven,const bool IsWidthEven,const double LengthOffSet,const double WidthOffset) const
 {
-	Super::BeginPlay();
-	
-	SetTileShape(ShapeType);
+	//不同形状的绘制不同
+	FRotator OffsetRotation = FRotator::ZeroRotator;
+	FVector OffsetLocation = FVector::ZeroVector;
+	switch (ShapeType)
+	{
+	case ETileShape::None:
+		break;
+	case ETileShape::Square:
+		//Grids的位置偏移
+		OffsetLocation = FVector(LeftBottomLocation.X + LengthOffSet, LeftBottomLocation.Y + WidthOffset, LeftBottomLocation.Z);
+		break;
+	case ETileShape::Triangle:
+		//Grids的位置偏移
+		OffsetLocation = FVector(LeftBottomLocation.X + LengthOffSet, LeftBottomLocation.Y + WidthOffset/2, LeftBottomLocation.Z);
+		//是偶数时翻转
+		if (IsWidthEven)
+		{
+			OffsetRotation +=FRotator(0,180,0);
+		}
+		if (IsLengthEven)
+		{
+			OffsetRotation +=FRotator(0,180,0);
+		}
+		break;
+	case ETileShape::Hexagon:
+		//Grids的位置偏移
+		OffsetLocation = FVector(LeftBottomLocation.X + LengthOffSet *1.5 , LeftBottomLocation.Y + WidthOffset/2, LeftBottomLocation.Z);
+		if (IsWidthEven)
+		{
+			OffsetLocation += FVector(GridSize.X * 0.75, 0 ,0);
+		}
+		break;
+	}
+	OutTransform.SetRotation(OffsetRotation.Quaternion());
+	OutTransform.SetLocation(OffsetLocation);
 }
+
+void AGridsActor::HexagonCountSet(int32& Length, int32& Width)
+{
+	Length /=2;
+	Width*=2;
+}
+
 
