@@ -96,7 +96,8 @@ FIntPoint UISMGridSyncBlueprintLibrary::GetIndexFromWorldLocation(const FVector&
 	FVector2D SizeVector2D = FVector2D::ZeroVector;
 	FVector2D SnapVector2D = FVector2D::ZeroVector;
 	FVector2D Result = FVector2D::ZeroVector;
-
+	
+	
 	//转化一下数据到2D格式
 	const FVector GridSize = Grids->GetGridSize();
 	//本地坐标:相对网格左下角的坐标

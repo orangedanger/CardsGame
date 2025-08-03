@@ -9,7 +9,6 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Math/Vector.h"
 #include "Cards/Cards.h"
-#include "EntitySystem/MovieSceneEntitySystemRunner.h"
 
 AGridsActor::AGridsActor()
 {
@@ -70,54 +69,13 @@ void AGridsActor::DrawGrid()
 		//判断长度是否为偶数
 		for (int j = 0; j < Width; j++)
 		{
-			//声明当前位置避免重复调用get函数
-			FVector CurrentPosition = Transform.GetLocation();
+			FIntPoint intPoint = FIntPoint(i,j);
 			
-			//对碰撞的变量进行初始化
-			TArray<FHitResult> Hits;
-			const float Radius = GridSize.X/3;
-			FVector Start(CurrentPosition.X, CurrentPosition.Y, CurrentPosition.Z + 500);
-			FVector End(CurrentPosition.X, CurrentPosition.Y, CurrentPosition.Z - 500);
+			AddInstance(intPoint,Transform);
 			
-			//进行碰撞检测
-			UKismetSystemLibrary::SphereTraceMulti(
-				this,
-				Start,
-				End,
-				Radius,
-				UEngineTypes::ConvertToTraceType(TRACE_GROUND),
-				false,
-				TArray<AActor*>(),
-				EDrawDebugTrace::None,
-				Hits,
-				true);
-			
-			if (Hits.Num()>0 && IsWalkable(Hits))
-			{
-				FIntPoint intPoint = FIntPoint(i,j);
-				
-				AddInstance(intPoint,Transform);
-				
-				//设置Tile的信息
-				FTileInfo TileInfo;
-				TileInfo.TileShape = ShapeType;
-				TileInfo.Transform = Transform;
-				TileInfo.TileStates.AddUnique(ETileState::Normal);
-				//这里是将数据转化为Index 和 相对Location
-				//成功则添加Tiles
-				Transform.SetLocation(CurrentPosition - LeftBottomLocation);
-				//六边形为双坐标宽度的
-				if (ShapeType == ETileShape::Hexagon)
-				{
-					const int32 OffSetX = j%2==0?1:0; 
-					intPoint.X *= 2;
-					intPoint.X +=OffSetX;
-				}
-				//添加Tile到数组
-				Tiles.Add(intPoint,TileInfo);
-			}
 		}
 	}
+	
 }
 
 void AGridsActor::AddInstance(FIntPoint Index,FTransform Transform)
@@ -130,9 +88,62 @@ void AGridsActor::AddInstance(FIntPoint Index,FTransform Transform)
 	
 	//计算不同形状的Tile的偏移,得到Transform
 	CalculateGridPositionAndRotation(Transform,IsLengthEven, IsWidthEven, LengthOffSet, WidthOffset);
+
+	//声明当前位置避免重复调用get函数
+	FVector CurrentPosition = Transform.GetLocation();
 	
-	//设置bWorldSpace,Mesh中的坐标是世界坐标
-	Mesh->AddInstance(Transform,true);
+	//对碰撞的变量进行初始化
+	TArray<FHitResult> Hits;
+	const float Radius = GridSize.X/3;
+	FVector Start(CurrentPosition.X, CurrentPosition.Y, CurrentPosition.Z + 500);
+	FVector End(CurrentPosition.X, CurrentPosition.Y, CurrentPosition.Z - 500);
+			
+	//进行碰撞检测
+	UKismetSystemLibrary::SphereTraceMulti(
+		this,
+		Start,
+		End,
+		Radius,
+		UEngineTypes::ConvertToTraceType(TRACE_GROUND),
+		false,
+		TArray<AActor*>(),
+		EDrawDebugTrace::None,
+		Hits,
+		true);
+	
+	if (Hits.Num()>0 && IsWalkable(Hits))
+	{
+		constexpr float OffsetGroundValue = 1.f;
+		CurrentPosition.Z = Hits[0].Location.Z  - Radius + OffsetGroundValue;
+		Transform.SetLocation(CurrentPosition);
+		
+		//设置bWorldSpace,Mesh中的坐标是世界坐标
+		Mesh->AddInstance(Transform,true);
+
+
+		//设置Tile的信息
+		FTileInfo TileInfo;
+		TileInfo.TileShape = ShapeType;
+		TileInfo.Transform = Transform;
+		TileInfo.TileStates.AddUnique(ETileState::Normal);
+		//这里是将数据转化为Index 和 相对Location
+		//成功则添加Tiles
+		TileInfo.Transform.SetLocation(Transform.GetLocation() - LeftBottomLocation);
+		//六边形为双坐标宽度的
+		if (ShapeType == ETileShape::Hexagon)
+		{
+			const int32 OffSetX = Index.Y%2==0?1:0; 
+			Index.X *= 2;
+			Index.X +=OffSetX;
+		}
+		TileInfo.Index = Index;
+		//添加Tile到数组
+		Tiles.Add(Index,TileInfo);
+
+		//TODO:不确定是否有效
+		//更新颜色
+		IGridInterface::Execute_UpdateInstance(this,TileInfo);
+	}
 }
 
 void AGridsActor::RemoveInstance(FIntPoint Index) const
@@ -140,13 +151,10 @@ void AGridsActor::RemoveInstance(FIntPoint Index) const
 	Mesh->RemoveInstance(Index.X * CountSize.X + Index.Y);
 }
 
-void AGridsActor::UpdateInstance_Implementation(const FTileInfo& Info)
+void AGridsActor::UpdateInstance_Implementation(FTileInfo Info)
 {
 	RemoveInstance(Info.Index);
 	AddInstance(Info.Index,Info.Transform);
-
-	//获取颜色信息
-	//在蓝图中实现
 }
 
 void AGridsActor::ClearGrid()
@@ -179,11 +187,8 @@ void AGridsActor::SetTileShape(ETileShape shapeType)
 	}
 }
 
-void AGridsActor::AddTileState(ETileState TileState)
+void AGridsActor::AddTileState(ETileState TileState,FIntPoint Index)
 {
-	const FVector HitTileLocation = UISMGridSyncBlueprintLibrary::GetCursorHitTileLocation(this,CenterLocation);
-	const FIntPoint Index = UISMGridSyncBlueprintLibrary::GetIndexFromWorldLocation(HitTileLocation,this);
-
 	if (FTileInfo* TileInfo =Tiles.Find(Index))
 	{
 		//检测TileStates有没有数据
@@ -192,24 +197,20 @@ void AGridsActor::AddTileState(ETileState TileState)
 			//有数据就更新
 			Tiles.Add(Index,*TileInfo);
 			//更新单个Instance
-			UpdateInstance(*TileInfo);
+			IGridInterface::Execute_UpdateInstance(this,*TileInfo);
 		}
 	}
 	
 }
 
-void AGridsActor::RemoveTileState(const ETileState TileState)
+void AGridsActor::RemoveTileState(const ETileState TileState,FIntPoint Index)
 {
-	const FVector HitTileLocation = UISMGridSyncBlueprintLibrary::GetCursorHitTileLocation(this,CenterLocation);
-	const FIntPoint Index = UISMGridSyncBlueprintLibrary::GetIndexFromWorldLocation(HitTileLocation,this);
-
 	if (FTileInfo* TileInfo =Tiles.Find(Index))
 	{
 		TileInfo->TileStates.Remove(TileState);
 		Tiles.Add(Index,*TileInfo);
-		
 		//更新单个Instance
-		UpdateInstance(*TileInfo);
+		IGridInterface::Execute_UpdateInstance(this,*TileInfo);
 	}
 }
 

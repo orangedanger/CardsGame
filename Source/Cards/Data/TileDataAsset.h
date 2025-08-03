@@ -35,6 +35,33 @@ public:
 	UMaterialInterface* DisabledMaterial = nullptr;
 };
 
+UENUM(BlueprintType)
+enum class ETileState : uint8
+{
+	Normal,
+	Hovered,
+	Pressed,
+	Disabled,
+	None	
+};
+
+USTRUCT(BlueprintType,Blueprintable)
+struct FTileInfo
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadWrite)
+	ETileShape TileShape = ETileShape::None ;	//形状
+	
+	UPROPERTY(BlueprintReadWrite)
+	FTransform Transform = FTransform();	//位置旋转缩放信息
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<ETileState>TileStates = TArray<ETileState>(); //Tiles的状态信息
+
+	UPROPERTY(BlueprintReadWrite)
+	FIntPoint Index = FIntPoint();			//Tile的Index信息
+};
 
 /**
  * 
